@@ -14,8 +14,8 @@ data = {
 }
 function = pd.DataFrame(data)
 
-pyt(function)
-
+print(function)
+#________________________________________----
 
 
 
