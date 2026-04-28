@@ -1,767 +1,1175 @@
 """
-BGMI-Inspired Battle Royale Game using Pygame
-=============================================
-A top-down battle royale shooter game inspired by BGMI (Battlegrounds Mobile India)
-Features: Player movement, shooting, enemies, safe zone, loot, health system, minimap, UI
-Author: Claude AI
-Lines: 1000+
+Windows OS Simulator - Python Pygame
+A full-featured desktop OS simulation with:
+- Desktop with icons
+- Taskbar with Start Menu, Clock, System Tray
+- Draggable, resizable windows
+- File Explorer
+- Notepad
+- Calculator
+- Paint app
+- Terminal
+- Settings panel
+- Context menus
+- Minimize/Maximize/Close
 """
 
 import pygame
-import random
-import math
 import sys
-import time
-from pygame import mixer
+import math
+import random
+import datetime
+import os
 
-# ─────────────────────────────────────────────
-#  INITIALIZATION
-# ─────────────────────────────────────────────
 pygame.init()
-mixer.init()
+pygame.font.init()
 
-# ─────────────────────────────────────────────
-#  CONSTANTS & CONFIGURATION
-# ─────────────────────────────────────────────
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 700
+# ─── CONSTANTS ───────────────────────────────────────────────────────────────
+SCREEN_W, SCREEN_H = 1280, 720
+TASKBAR_H = 48
 FPS = 60
-TITLE = "BGMI - Battle Royale (Pygame)"
 
-# Map size (larger than screen for scrolling)
-MAP_WIDTH = 3000
-MAP_HEIGHT = 3000
+# Windows XP / 7 style palette
+COL_DESKTOP     = (58, 110, 165)
+COL_TASKBAR     = (25, 75, 135)
+COL_TASKBAR_BTN = (40, 100, 160)
+COL_WIN_TITLE   = (16, 85, 185)
+COL_WIN_TITLE2  = (166, 202, 240)
+COL_WIN_BG      = (236, 233, 216)
+COL_WIN_BORDER  = (0, 60, 116)
+COL_BTN         = (212, 208, 200)
+COL_BTN_HOVER   = (230, 230, 230)
+COL_BTN_PRESS   = (180, 180, 180)
+COL_WHITE       = (255, 255, 255)
+COL_BLACK       = (0, 0, 0)
+COL_RED         = (220, 50, 50)
+COL_GREEN       = (50, 200, 50)
+COL_BLUE        = (0, 100, 255)
+COL_GRAY        = (160, 160, 160)
+COL_LGRAY       = (220, 220, 220)
+COL_DGRAY       = (80, 80, 80)
+COL_YELLOW      = (255, 220, 50)
+COL_START_BTN   = (70, 130, 50)
+COL_STARTMENU   = (30, 60, 120)
+COL_ICON_BG     = (255, 255, 255, 60)
+COL_CLOSE       = (180, 30, 30)
+COL_MINIMIZE    = (200, 160, 30)
+COL_MAXIMIZE    = (40, 160, 40)
+COL_TERM_BG     = (12, 12, 12)
+COL_TERM_TEXT   = (204, 204, 204)
 
-# Colors
-BLACK       = (0, 0, 0)
-WHITE       = (255, 255, 255)
-RED         = (220, 50, 50)
-GREEN       = (50, 200, 80)
-DARK_GREEN  = (30, 120, 50)
-BLUE        = (50, 100, 220)
-YELLOW      = (255, 215, 0)
-ORANGE      = (255, 140, 0)
-CYAN        = (0, 220, 220)
-PURPLE      = (150, 50, 220)
-BROWN       = (139, 90, 43)
-GRAY        = (120, 120, 120)
-DARK_GRAY   = (60, 60, 60)
-LIGHT_GRAY  = (180, 180, 180)
-SAND        = (210, 180, 140)
-DARK_BLUE   = (10, 20, 60)
-PINK        = (255, 105, 180)
-LIME        = (150, 255, 50)
-TEAL        = (0, 180, 150)
+# Fonts
+try:
+    FONT_SM  = pygame.font.SysFont("Segoe UI", 12)
+    FONT_MD  = pygame.font.SysFont("Segoe UI", 14)
+    FONT_LG  = pygame.font.SysFont("Segoe UI", 16, bold=True)
+    FONT_XL  = pygame.font.SysFont("Segoe UI", 22, bold=True)
+    FONT_ICON= pygame.font.SysFont("Segoe UI", 11)
+    FONT_MONO= pygame.font.SysFont("Courier New", 13)
+    FONT_CALC= pygame.font.SysFont("Segoe UI", 24, bold=True)
+    FONT_CLOCK=pygame.font.SysFont("Segoe UI", 13, bold=True)
+except:
+    FONT_SM = FONT_MD = FONT_LG = FONT_XL = FONT_ICON = FONT_MONO = FONT_CALC = FONT_CLOCK = pygame.font.Font(None, 18)
 
-# Player settings
-PLAYER_SPEED       = 4
-PLAYER_HEALTH      = 100
-PLAYER_SIZE        = 18
-PLAYER_COLOR       = (50, 180, 255)
-BULLET_SPEED       = 14
-BULLET_DAMAGE      = 20
-BULLET_SIZE        = 5
-SHOOT_COOLDOWN     = 15   # frames
-RELOAD_TIME        = 90   # frames
-MAG_SIZE           = 30
+# ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-# Enemy settings
-ENEMY_SPEED        = 2
-ENEMY_HEALTH       = 80
-ENEMY_SIZE         = 16
-ENEMY_COLOR        = (220, 60, 60)
-ENEMY_SHOOT_RANGE  = 300
-ENEMY_SIGHT_RANGE  = 400
-ENEMY_SHOOT_DELAY  = 60
-NUM_ENEMIES        = 25
+def draw_rect_rounded(surf, color, rect, radius=6):
+    pygame.draw.rect(surf, color, rect, border_radius=radius)
 
-# Safe zone settings
-ZONE_SHRINK_INTERVAL = 600   # frames between shrinks
-ZONE_DAMAGE          = 0.5   # damage per frame outside zone
-ZONE_MIN_RADIUS      = 80
-
-# Loot settings
-NUM_LOOT_CRATES  = 30
-NUM_MEDKITS      = 20
-NUM_AMMO_BOXES   = 25
-NUM_ARMOR_BOXES  = 10
-
-# ─────────────────────────────────────────────
-#  SCREEN SETUP
-# ─────────────────────────────────────────────
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption(TITLE)
-clock = pygame.time.Clock()
-
-# ─────────────────────────────────────────────
-#  FONTS
-# ─────────────────────────────────────────────
-font_large  = pygame.font.SysFont("consolas", 36, bold=True)
-font_medium = pygame.font.SysFont("consolas", 22, bold=True)
-font_small  = pygame.font.SysFont("consolas", 16)
-font_tiny   = pygame.font.SysFont("consolas", 13)
-
-# ─────────────────────────────────────────────
-#  CAMERA
-# ─────────────────────────────────────────────
-class Camera:
-    def __init__(self):
-        self.offset_x = 0
-        self.offset_y = 0
-
-    def update(self, target_x, target_y):
-        self.offset_x = target_x - SCREEN_WIDTH // 2
-        self.offset_y = target_y - SCREEN_HEIGHT // 2
-        self.offset_x = max(0, min(self.offset_x, MAP_WIDTH - SCREEN_WIDTH))
-        self.offset_y = max(0, min(self.offset_y, MAP_HEIGHT - SCREEN_HEIGHT))
-
-    def apply(self, x, y):
-        return x - self.offset_x, y - self.offset_y
-
-    def apply_rect(self, rect):
-        return pygame.Rect(rect.x - self.offset_x, rect.y - self.offset_y, rect.w, rect.h)
-
-# ─────────────────────────────────────────────
-#  BULLET CLASS
-# ─────────────────────────────────────────────
-class Bullet:
-    def __init__(self, x, y, angle, owner="player", damage=BULLET_DAMAGE):
-        self.x = float(x)
-        self.y = float(y)
-        self.angle = angle
-        self.speed = BULLET_SPEED
-        self.damage = damage
-        self.owner = owner
-        self.vx = math.cos(angle) * self.speed
-        self.vy = math.sin(angle) * self.speed
-        self.alive = True
-        self.trail = []
-        self.color = YELLOW if owner == "player" else RED
-        self.size = BULLET_SIZE
-
-    def update(self):
-        self.trail.append((int(self.x), int(self.y)))
-        if len(self.trail) > 5:
-            self.trail.pop(0)
-        self.x += self.vx
-        self.y += self.vy
-        if not (0 <= self.x <= MAP_WIDTH and 0 <= self.y <= MAP_HEIGHT):
-            self.alive = False
-
-    def draw(self, surface, camera):
-        for i, pos in enumerate(self.trail):
-            sx, sy = camera.apply(*pos)
-            alpha = int(255 * (i + 1) / len(self.trail))
-            trail_color = (*self.color[:3], alpha)
-            pygame.draw.circle(surface, self.color, (sx, sy), max(1, self.size - (len(self.trail) - i)))
-        sx, sy = camera.apply(int(self.x), int(self.y))
-        pygame.draw.circle(surface, WHITE, (sx, sy), self.size)
-        pygame.draw.circle(surface, self.color, (sx, sy), self.size - 1)
-
-# ─────────────────────────────────────────────
-#  PARTICLE CLASS (Visual effects)
-# ─────────────────────────────────────────────
-class Particle:
-    def __init__(self, x, y, color, speed=3, lifetime=30, size=4):
-        self.x = float(x)
-        self.y = float(y)
-        self.color = color
-        self.vx = random.uniform(-speed, speed)
-        self.vy = random.uniform(-speed, speed)
-        self.lifetime = lifetime
-        self.max_lifetime = lifetime
-        self.size = size
-        self.alive = True
-
-    def update(self):
-        self.x += self.vx
-        self.y += self.vy
-        self.vy += 0.1  # gravity
-        self.lifetime -= 1
-        if self.lifetime <= 0:
-            self.alive = False
-
-    def draw(self, surface, camera):
-        sx, sy = camera.apply(int(self.x), int(self.y))
-        alpha_ratio = self.lifetime / self.max_lifetime
-        size = max(1, int(self.size * alpha_ratio))
-        r = min(255, int(self.color[0]))
-        g = min(255, int(self.color[1]))
-        b = min(255, int(self.color[2]))
-        pygame.draw.circle(surface, (r, g, b), (sx, sy), size)
-
-# ─────────────────────────────────────────────
-#  LOOT ITEM CLASS
-# ─────────────────────────────────────────────
-class LootItem:
-    TYPES = {
-        "medkit":   {"color": PINK,   "size": 12, "symbol": "+"},
-        "ammo":     {"color": YELLOW, "size": 10, "symbol": "A"},
-        "armor":    {"color": CYAN,   "size": 11, "symbol": "V"},
-        "weapon":   {"color": ORANGE, "size": 13, "symbol": "W"},
-    }
-
-    def __init__(self, x, y, loot_type="medkit"):
-        self.x = x
-        self.y = y
-        self.type = loot_type
-        self.info = self.TYPES.get(loot_type, self.TYPES["medkit"])
-        self.rect = pygame.Rect(x - self.info["size"], y - self.info["size"],
-                                self.info["size"] * 2, self.info["size"] * 2)
-        self.alive = True
-        self.bob_timer = random.uniform(0, math.pi * 2)
-        self.pulse = 0
-
-    def update(self):
-        self.bob_timer += 0.05
-        self.pulse = (math.sin(self.bob_timer) + 1) / 2
-
-    def draw(self, surface, camera):
-        sx, sy = camera.apply(self.x, self.y)
-        sy_bob = sy + int(math.sin(self.bob_timer) * 3)
-        size = self.info["size"]
-        glow_size = size + int(self.pulse * 5)
-        glow_color = tuple(min(255, c + 80) for c in self.info["color"])
-        pygame.draw.circle(surface, glow_color, (sx, sy_bob), glow_size, 2)
-        pygame.draw.rect(surface, DARK_GRAY, (sx - size, sy_bob - size, size * 2, size * 2), border_radius=4)
-        pygame.draw.rect(surface, self.info["color"], (sx - size + 2, sy_bob - size + 2,
-                          size * 2 - 4, size * 2 - 4), border_radius=3)
-        label = font_tiny.render(self.info["symbol"], True, WHITE)
-        surface.blit(label, (sx - label.get_width() // 2, sy_bob - label.get_height() // 2))
-
-# ─────────────────────────────────────────────
-#  TREE / OBSTACLE CLASS
-# ─────────────────────────────────────────────
-class Tree:
-    def __init__(self, x, y, size=None):
-        self.x = x
-        self.y = y
-        self.size = size or random.randint(18, 35)
-        self.color = random.choice([DARK_GREEN, (20, 100, 40), (40, 130, 60)])
-        self.trunk_color = BROWN
-        self.rect = pygame.Rect(x - self.size // 2, y - self.size // 2, self.size, self.size)
-
-    def draw(self, surface, camera):
-        sx, sy = camera.apply(self.x, self.y)
-        # Trunk
-        pygame.draw.rect(surface, self.trunk_color,
-                          (sx - 4, sy, 8, 14), border_radius=2)
-        # Canopy
-        pygame.draw.circle(surface, self.trunk_color, (sx, sy), self.size + 2)
-        pygame.draw.circle(surface, self.color, (sx, sy), self.size)
-        pygame.draw.circle(surface, tuple(min(255, c + 40) for c in self.color),
-                           (sx - self.size // 4, sy - self.size // 4),
-                           self.size // 3)
-
-# ─────────────────────────────────────────────
-#  BUILDING / COVER CLASS
-# ─────────────────────────────────────────────
-class Building:
-    def __init__(self, x, y, w=None, h=None):
-        self.x = x
-        self.y = y
-        self.w = w or random.randint(60, 120)
-        self.h = h or random.randint(60, 120)
-        self.color = random.choice([GRAY, DARK_GRAY, (100, 90, 80), (110, 100, 90)])
-        self.roof_color = tuple(max(0, c - 30) for c in self.color)
-        self.rect = pygame.Rect(x - self.w // 2, y - self.h // 2, self.w, self.h)
-
-    def draw(self, surface, camera):
-        sx, sy = camera.apply(self.x - self.w // 2, self.y - self.h // 2)
-        # Shadow
-        pygame.draw.rect(surface, (30, 30, 30), (sx + 4, sy + 4, self.w, self.h), border_radius=3)
-        # Body
-        pygame.draw.rect(surface, self.color, (sx, sy, self.w, self.h), border_radius=3)
-        # Roof accent
-        pygame.draw.rect(surface, self.roof_color, (sx + 4, sy + 4, self.w - 8, self.h - 8),
-                         border_radius=2)
-        # Windows
-        for wy in range(2):
-            for wx in range(2):
-                wx_pos = sx + 10 + wx * (self.w // 2 - 10)
-                wy_pos = sy + 10 + wy * (self.h // 2 - 10)
-                pygame.draw.rect(surface, DARK_BLUE, (wx_pos, wy_pos, 14, 10), border_radius=2)
-                pygame.draw.rect(surface, CYAN, (wx_pos + 2, wy_pos + 2, 5, 3))
-
-# ─────────────────────────────────────────────
-#  ENEMY CLASS
-# ─────────────────────────────────────────────
-class Enemy:
-    def __init__(self, x, y):
-        self.x = float(x)
-        self.y = float(y)
-        self.health = ENEMY_HEALTH
-        self.max_health = ENEMY_HEALTH
-        self.size = ENEMY_SIZE
-        self.color = ENEMY_COLOR
-        self.speed = ENEMY_SPEED + random.uniform(-0.5, 0.5)
-        self.alive = True
-        self.shoot_cooldown = random.randint(0, ENEMY_SHOOT_DELAY)
-        self.state = "patrol"   # patrol, chase, shoot
-        self.patrol_target = (random.randint(100, MAP_WIDTH - 100),
-                               random.randint(100, MAP_HEIGHT - 100))
-        self.bullets = []
-        self.angle = 0
-        self.hit_flash = 0
-        self.kill_count = 0
-
-    def update(self, player, obstacles):
-        if not self.alive:
-            return
-
-        if self.hit_flash > 0:
-            self.hit_flash -= 1
-
-        dx = player.x - self.x
-        dy = player.y - self.y
-        dist = math.hypot(dx, dy)
-
-        # State machine
-        if dist < ENEMY_SIGHT_RANGE:
-            if dist < ENEMY_SHOOT_RANGE:
-                self.state = "shoot"
-            else:
-                self.state = "chase"
+def draw_gradient_rect(surf, color1, color2, rect, vertical=True):
+    x, y, w, h = rect
+    for i in range(h if vertical else w):
+        t = i / max(h if vertical else w, 1)
+        c = tuple(int(color1[j] + (color2[j] - color1[j]) * t) for j in range(3))
+        if vertical:
+            pygame.draw.line(surf, c, (x, y + i), (x + w, y + i))
         else:
-            self.state = "patrol"
+            pygame.draw.line(surf, c, (x + i, y), (x + i, y + h))
 
-        if self.state == "chase" or self.state == "shoot":
-            self.angle = math.atan2(dy, dx)
+def clamp(val, lo, hi):
+    return max(lo, min(hi, val))
 
-        # Movement
-        if self.state == "patrol":
-            pdx = self.patrol_target[0] - self.x
-            pdy = self.patrol_target[1] - self.y
-            pdist = math.hypot(pdx, pdy)
-            if pdist < 20:
-                self.patrol_target = (random.randint(100, MAP_WIDTH - 100),
-                                       random.randint(100, MAP_HEIGHT - 100))
-            else:
-                move_angle = math.atan2(pdy, pdx)
-                self.x += math.cos(move_angle) * self.speed * 0.5
-                self.y += math.sin(move_angle) * self.speed * 0.5
+def text_surf(text, font, color=COL_BLACK):
+    return font.render(str(text), True, color)
 
-        elif self.state == "chase":
-            self.x += math.cos(self.angle) * self.speed
-            self.y += math.sin(self.angle) * self.speed
+# ─── DESKTOP ICON ────────────────────────────────────────────────────────────
 
-        # Clamp to map
-        self.x = max(self.size, min(MAP_WIDTH - self.size, self.x))
-        self.y = max(self.size, min(MAP_HEIGHT - self.size, self.y))
+class DesktopIcon:
+    SIZE = 72
+    def __init__(self, name, icon_color, x, y, app_type):
+        self.name = name
+        self.icon_color = icon_color
+        self.x = x
+        self.y = y
+        self.app_type = app_type
+        self.selected = False
+        self.rect = pygame.Rect(x, y, self.SIZE, self.SIZE + 18)
 
-        # Shooting
-        if self.state == "shoot":
-            self.shoot_cooldown -= 1
-            if self.shoot_cooldown <= 0:
-                self.shoot_cooldown = ENEMY_SHOOT_DELAY + random.randint(-10, 20)
-                scatter = random.uniform(-0.15, 0.15)
-                b = Bullet(self.x, self.y, self.angle + scatter, owner="enemy", damage=15)
-                self.bullets.append(b)
+    def draw(self, surf):
+        # Shadow
+        pygame.draw.rect(surf, (0,0,0,40), (self.x+3, self.y+3, 48, 48), border_radius=8)
+        # Icon body
+        draw_rect_rounded(surf, self.icon_color, (self.x, self.y, 48, 48), 8)
+        # Shine overlay
+        shine = pygame.Surface((48, 24), pygame.SRCALPHA)
+        shine.fill((255,255,255,40))
+        surf.blit(shine, (self.x, self.y))
+        # Draw symbol inside icon
+        self._draw_symbol(surf)
+        # Selection highlight
+        if self.selected:
+            s = pygame.Surface((self.SIZE, self.SIZE+18), pygame.SRCALPHA)
+            s.fill((100,150,255,60))
+            surf.blit(s, (self.x - 12, self.y - 4))
+        # Label background
+        label = FONT_ICON.render(self.name, True, COL_WHITE)
+        lw = label.get_width()
+        bx = self.x + 24 - lw//2 - 3
+        bg = pygame.Surface((lw+6, 16), pygame.SRCALPHA)
+        bg.fill((0,0,0,100) if not self.selected else (50,100,200,160))
+        surf.blit(bg, (bx, self.y+50))
+        surf.blit(label, (bx+3, self.y+51))
 
-        # Update enemy bullets
-        for b in self.bullets:
-            b.update()
-        self.bullets = [b for b in self.bullets if b.alive]
+    def _draw_symbol(self, surf):
+        cx, cy = self.x+24, self.y+24
+        t = self.app_type
+        if t == "notepad":
+            pygame.draw.rect(surf, COL_WHITE, (self.x+10, self.y+8, 28, 32), border_radius=2)
+            for i in range(4):
+                pygame.draw.line(surf, COL_LGRAY, (self.x+14, self.y+14+i*6), (self.x+34, self.y+14+i*6), 1)
+            pygame.draw.line(surf, COL_BLUE, (self.x+12, self.y+12), (self.x+22, self.y+36), 2)
+        elif t == "calculator":
+            pygame.draw.rect(surf, (50,50,80), (self.x+10, self.y+8, 28, 32), border_radius=3)
+            pygame.draw.rect(surf, COL_WHITE, (self.x+13, self.y+11, 22, 8), border_radius=1)
+            for r in range(3):
+                for c in range(3):
+                    pygame.draw.rect(surf, COL_LGRAY, (self.x+13+c*7, self.y+22+r*6, 5, 4), border_radius=1)
+        elif t == "explorer":
+            pygame.draw.rect(surf, (220,180,80), (self.x+8, self.y+16, 32, 24), border_radius=3)
+            pygame.draw.rect(surf, (200,155,60), (self.x+8, self.y+12, 16, 8), border_radius=2)
+            pygame.draw.line(surf, COL_WHITE, (self.x+14, self.y+22), (self.x+34, self.y+22), 1)
+            pygame.draw.line(surf, COL_WHITE, (self.x+14, self.y+27), (self.x+30, self.y+27), 1)
+        elif t == "paint":
+            pygame.draw.ellipse(surf, (220,60,60), (self.x+8, self.y+8, 32, 32))
+            pygame.draw.ellipse(surf, (60,180,60), (self.x+14, self.y+8, 20, 20))
+            pygame.draw.ellipse(surf, (60,60,220), (self.x+8, self.y+20, 20, 20))
+            pygame.draw.ellipse(surf, COL_WHITE, (self.x+18, self.y+18, 12, 12))
+        elif t == "terminal":
+            pygame.draw.rect(surf, COL_TERM_BG, (self.x+8, self.y+8, 32, 32), border_radius=4)
+            surf.blit(FONT_MONO.render(">_", True, COL_GREEN), (self.x+10, self.y+18))
+        elif t == "settings":
+            pygame.draw.circle(surf, COL_LGRAY, (cx, cy), 14)
+            pygame.draw.circle(surf, self.icon_color, (cx, cy), 8)
+            for angle in range(0, 360, 45):
+                rad = math.radians(angle)
+                sx = cx + int(math.cos(rad)*14)
+                sy = cy + int(math.sin(rad)*14)
+                pygame.draw.circle(surf, COL_LGRAY, (sx, sy), 4)
+                pygame.draw.circle(surf, COL_WHITE, (sx, sy), 2)
+        elif t == "recycle":
+            pygame.draw.polygon(surf, (100,200,100), [(cx, self.y+10),(cx+14,self.y+30),(cx-14,self.y+30)])
+            pygame.draw.polygon(surf, (60,160,60), [(cx-2,self.y+26),(cx+12,self.y+40),(cx-14,self.y+40)])
+        else:
+            pygame.draw.rect(surf, COL_WHITE, (self.x+10,self.y+10,28,28), border_radius=4)
 
-    def take_damage(self, amount):
-        self.health -= amount
-        self.hit_flash = 8
-        if self.health <= 0:
-            self.health = 0
-            self.alive = False
-            return True
+# ─── WINDOW BASE CLASS ───────────────────────────────────────────────────────
+
+class Window:
+    MIN_W, MIN_H = 200, 150
+    TITLE_H = 30
+
+    def __init__(self, title, x, y, w, h, app_type="generic"):
+        self.title = title
+        self.rect = pygame.Rect(x, y, w, h)
+        self.app_type = app_type
+        self.dragging = False
+        self.drag_offset = (0, 0)
+        self.resizing = False
+        self.resize_edge = None
+        self.minimized = False
+        self.maximized = False
+        self._pre_max_rect = None
+        self.focused = True
+        self.alive = True
+        self.taskbar_btn = None  # assigned by OS
+
+    @property
+    def title_rect(self):
+        return pygame.Rect(self.rect.x, self.rect.y, self.rect.w, self.TITLE_H)
+
+    @property
+    def close_btn(self):
+        return pygame.Rect(self.rect.right - 30, self.rect.y + 5, 22, 20)
+
+    @property
+    def max_btn(self):
+        return pygame.Rect(self.rect.right - 54, self.rect.y + 5, 22, 20)
+
+    @property
+    def min_btn(self):
+        return pygame.Rect(self.rect.right - 78, self.rect.y + 5, 22, 20)
+
+    @property
+    def content_rect(self):
+        return pygame.Rect(self.rect.x+2, self.rect.y+self.TITLE_H, self.rect.w-4, self.rect.h-self.TITLE_H-2)
+
+    def draw(self, surf, focused=True):
+        if self.minimized:
+            return
+        # Window shadow
+        shadow = pygame.Surface((self.rect.w+8, self.rect.h+8), pygame.SRCALPHA)
+        pygame.draw.rect(shadow, (0,0,0,60), (4, 4, self.rect.w, self.rect.h), border_radius=6)
+        surf.blit(shadow, (self.rect.x-4, self.rect.y-4))
+
+        # Title bar gradient
+        tc1 = COL_WIN_TITLE if focused else COL_GRAY
+        tc2 = COL_WIN_TITLE2 if focused else COL_LGRAY
+        draw_gradient_rect(surf, tc1, tc2, (self.rect.x, self.rect.y, self.rect.w, self.TITLE_H), vertical=False)
+        pygame.draw.rect(surf, COL_WIN_BORDER, self.rect, 2, border_radius=4)
+
+        # Title text
+        t = FONT_MD.render(self.title, True, COL_WHITE if focused else COL_DGRAY)
+        surf.blit(t, (self.rect.x + 8, self.rect.y + 7))
+
+        # Control buttons
+        self._draw_ctrl_btn(surf, self.close_btn,   COL_CLOSE,    "✕")
+        self._draw_ctrl_btn(surf, self.max_btn,     COL_MAXIMIZE, "□")
+        self._draw_ctrl_btn(surf, self.min_btn,     COL_MINIMIZE, "─")
+
+        # Window background
+        pygame.draw.rect(surf, COL_WIN_BG, self.content_rect)
+
+        # Content
+        self.draw_content(surf)
+
+    def _draw_ctrl_btn(self, surf, r, color, sym):
+        mx, my = pygame.mouse.get_pos()
+        hovered = r.collidepoint(mx, my)
+        c = tuple(min(255, v+40) for v in color) if hovered else color
+        draw_rect_rounded(surf, c, r, 4)
+        s = FONT_SM.render(sym, True, COL_WHITE)
+        surf.blit(s, (r.centerx - s.get_width()//2, r.centery - s.get_height()//2))
+
+    def draw_content(self, surf):
+        pass  # override in subclasses
+
+    def handle_event(self, event):
+        pass  # override in subclasses
+
+    def handle_titlebar_event(self, event, os_ref):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            if self.close_btn.collidepoint(mx, my):
+                self.alive = False
+                return True
+            elif self.max_btn.collidepoint(mx, my):
+                self.toggle_maximize(os_ref)
+                return True
+            elif self.min_btn.collidepoint(mx, my):
+                self.minimized = True
+                return True
+            elif self.title_rect.collidepoint(mx, my) and not self.maximized:
+                self.dragging = True
+                self.drag_offset = (mx - self.rect.x, my - self.rect.y)
+                return True
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.dragging = False
+        elif event.type == pygame.MOUSEMOTION:
+            if self.dragging:
+                mx, my = event.pos
+                self.rect.x = mx - self.drag_offset[0]
+                self.rect.y = my - self.drag_offset[1]
+                self.rect.y = clamp(self.rect.y, 0, SCREEN_H - TASKBAR_H - self.TITLE_H)
         return False
 
-    def draw(self, surface, camera):
-        if not self.alive:
-            return
-        sx, sy = camera.apply(int(self.x), int(self.y))
-        # Draw direction indicator
-        end_x = sx + int(math.cos(self.angle) * (self.size + 8))
-        end_y = sy + int(math.sin(self.angle) * (self.size + 8))
-        pygame.draw.line(surface, ORANGE, (sx, sy), (end_x, end_y), 2)
+    def toggle_maximize(self, os_ref):
+        if not self.maximized:
+            self._pre_max_rect = pygame.Rect(self.rect)
+            self.rect = pygame.Rect(0, 0, SCREEN_W, SCREEN_H - TASKBAR_H)
+            self.maximized = True
+        else:
+            self.rect = pygame.Rect(self._pre_max_rect)
+            self.maximized = False
 
-        # Body
-        color = WHITE if self.hit_flash > 0 else self.color
-        pygame.draw.circle(surface, DARK_GRAY, (sx + 2, sy + 2), self.size)
-        pygame.draw.circle(surface, color, (sx, sy), self.size)
-        # Head detail
-        pygame.draw.circle(surface, tuple(max(0, c - 40) for c in color), (sx, sy - 4), 7)
-        # Eyes
-        eye_angle = self.angle
-        ex = sx + int(math.cos(eye_angle - 0.4) * 6)
-        ey = sy + int(math.sin(eye_angle - 0.4) * 6)
-        pygame.draw.circle(surface, RED, (ex, ey), 2)
+# ─── NOTEPAD APP ─────────────────────────────────────────────────────────────
 
-        # Health bar
-        bar_w = 36
-        bar_h = 5
-        bx = sx - bar_w // 2
-        by = sy - self.size - 10
-        pygame.draw.rect(surface, DARK_GRAY, (bx - 1, by - 1, bar_w + 2, bar_h + 2))
-        pygame.draw.rect(surface, RED, (bx, by, bar_w, bar_h))
-        hp_ratio = self.health / self.max_health
-        pygame.draw.rect(surface, GREEN, (bx, by, int(bar_w * hp_ratio), bar_h))
-
-        # Bullets
-        for b in self.bullets:
-            b.draw(surface, camera)
-
-# ─────────────────────────────────────────────
-#  PLAYER CLASS
-# ─────────────────────────────────────────────
-class Player:
+class NotepadWindow(Window):
     def __init__(self, x, y):
-        self.x = float(x)
-        self.y = float(y)
-        self.health = PLAYER_HEALTH
-        self.max_health = PLAYER_HEALTH
-        self.armor = 0
-        self.max_armor = 100
-        self.size = PLAYER_SIZE
-        self.color = PLAYER_COLOR
-        self.speed = PLAYER_SPEED
-        self.alive = True
-        self.angle = 0.0
+        super().__init__("📄 Notepad", x, y, 500, 400, "notepad")
+        self.text = "Welcome to PyNotepad!\n\nStart typing here...\n"
+        self.cursor_pos = len(self.text)
+        self.scroll_y = 0
+        self.blink = 0
 
-        # Weapon stats
-        self.ammo = MAG_SIZE
-        self.max_ammo = MAG_SIZE
-        self.reserve_ammo = 90
-        self.shoot_cooldown = 0
-        self.reload_timer = 0
-        self.reloading = False
-        self.kills = 0
-        self.shots_fired = 0
-        self.shots_hit = 0
+    def draw_content(self, surf):
+        cr = self.content_rect
+        # Toolbar
+        pygame.draw.rect(surf, COL_BTN, (cr.x, cr.y, cr.w, 26))
+        for i, lbl in enumerate(["File", "Edit", "Format", "View", "Help"]):
+            t = FONT_MD.render(lbl, True, COL_BLACK)
+            surf.blit(t, (cr.x + 8 + i*60, cr.y + 5))
+        pygame.draw.line(surf, COL_GRAY, (cr.x, cr.y+26), (cr.right, cr.y+26))
 
-        # Inventory
-        self.medkits = 2
-        self.weapon = "M416"
+        # Text area
+        ta = pygame.Rect(cr.x+2, cr.y+28, cr.w-18, cr.h-30)
+        pygame.draw.rect(surf, COL_WHITE, ta)
+        pygame.draw.rect(surf, COL_GRAY, ta, 1)
 
-        self.bullets = []
-        self.particles = []
-        self.hit_flash = 0
-        self.footstep_timer = 0
-        self.moving = False
-        self.last_pos = (x, y)
+        # Render text lines
+        lines = self.text.split('\n')
+        y_off = ta.y + 4 - self.scroll_y
+        for li, line in enumerate(lines):
+            if y_off > ta.bottom: break
+            if y_off + 16 > ta.y:
+                t = FONT_MONO.render(line if line else " ", True, COL_BLACK)
+                surf.blit(t, (ta.x+4, y_off))
+                # Draw cursor
+                if self.blink % 60 < 30:
+                    self._draw_cursor(surf, lines, ta, y_off, li)
+            y_off += 18
 
-    def handle_input(self, keys):
-        vx, vy = 0, 0
-        if keys[pygame.K_w] or keys[pygame.K_UP]:    vy -= self.speed
-        if keys[pygame.K_s] or keys[pygame.K_DOWN]:  vy += self.speed
-        if keys[pygame.K_a] or keys[pygame.K_LEFT]:  vx -= self.speed
-        if keys[pygame.K_d] or keys[pygame.K_RIGHT]: vx += self.speed
+        # Scrollbar
+        total_h = len(lines) * 18
+        if total_h > ta.h:
+            sb_h = max(20, int(ta.h * ta.h / total_h))
+            sb_y = ta.y + int(self.scroll_y / total_h * ta.h)
+            pygame.draw.rect(surf, COL_LGRAY, (ta.right, ta.y, 16, ta.h))
+            pygame.draw.rect(surf, COL_GRAY, (ta.right+2, sb_y, 12, sb_h), border_radius=4)
 
-        # Normalize diagonal movement
-        if vx != 0 and vy != 0:
-            factor = 1 / math.sqrt(2)
-            vx *= factor
-            vy *= factor
+        self.blink = (self.blink + 1) % 60
 
-        self.x += vx
-        self.y += vy
-        self.x = max(self.size, min(MAP_WIDTH - self.size, self.x))
-        self.y = max(self.size, min(MAP_HEIGHT - self.size, self.y))
+    def _draw_cursor(self, surf, lines, ta, y_off, cur_line):
+        # Count chars before cursor
+        before = sum(len(lines[i])+1 for i in range(cur_line))
+        pos_in_line = self.cursor_pos - before
+        if 0 <= pos_in_line <= len(lines[cur_line]):
+            cx = ta.x + 4 + FONT_MONO.size(lines[cur_line][:pos_in_line])[0]
+            pygame.draw.line(surf, COL_BLACK, (cx, y_off), (cx, y_off+16), 2)
 
-        self.moving = (vx != 0 or vy != 0)
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                if self.cursor_pos > 0:
+                    self.text = self.text[:self.cursor_pos-1] + self.text[self.cursor_pos:]
+                    self.cursor_pos -= 1
+            elif event.key == pygame.K_DELETE:
+                if self.cursor_pos < len(self.text):
+                    self.text = self.text[:self.cursor_pos] + self.text[self.cursor_pos+1:]
+            elif event.key == pygame.K_RETURN:
+                self.text = self.text[:self.cursor_pos] + '\n' + self.text[self.cursor_pos:]
+                self.cursor_pos += 1
+            elif event.key == pygame.K_LEFT:
+                self.cursor_pos = max(0, self.cursor_pos-1)
+            elif event.key == pygame.K_RIGHT:
+                self.cursor_pos = min(len(self.text), self.cursor_pos+1)
+            elif event.unicode and event.unicode.isprintable():
+                self.text = self.text[:self.cursor_pos] + event.unicode + self.text[self.cursor_pos:]
+                self.cursor_pos += 1
+        elif event.type == pygame.MOUSEWHEEL:
+            self.scroll_y = clamp(self.scroll_y - event.y*18, 0, max(0, len(self.text.split('\n'))*18 - 200))
 
-        # Reload
-        if keys[pygame.K_r] and not self.reloading and self.ammo < self.max_ammo and self.reserve_ammo > 0:
-            self.reloading = True
-            self.reload_timer = RELOAD_TIME
+# ─── CALCULATOR APP ──────────────────────────────────────────────────────────
 
-        # Use medkit
-        if keys[pygame.K_e] and self.medkits > 0 and self.health < self.max_health:
-            self.health = min(self.max_health, self.health + 40)
-            self.medkits -= 1
-            for _ in range(12):
-                self.particles.append(Particle(self.x, self.y, PINK, speed=2, lifetime=25))
+class CalculatorWindow(Window):
+    BTNS = [
+        ['C', '±', '%', '÷'],
+        ['7', '8', '9', '×'],
+        ['4', '5', '6', '−'],
+        ['1', '2', '3', '+'],
+        ['0', '.', '='],
+    ]
+    def __init__(self, x, y):
+        super().__init__("🧮 Calculator", x, y, 260, 360, "calculator")
+        self.display = "0"
+        self.prev = None
+        self.op = None
+        self.new_num = True
+        self._btn_rects = {}
 
-    def shoot(self, target_x, target_y, camera):
-        if self.reloading or self.shoot_cooldown > 0 or self.ammo <= 0:
-            return
-        # Convert screen coords to world coords
-        wx = target_x + camera.offset_x
-        wy = target_y + camera.offset_y
-        self.angle = math.atan2(wy - self.y, wx - self.x)
-        # Slight spread
-        spread = random.uniform(-0.04, 0.04)
-        b = Bullet(self.x, self.y, self.angle + spread, owner="player")
-        self.bullets.append(b)
-        self.ammo -= 1
-        self.shots_fired += 1
-        self.shoot_cooldown = SHOOT_COOLDOWN
-        # Muzzle flash particles
-        for _ in range(6):
-            self.particles.append(Particle(self.x + math.cos(self.angle) * self.size,
-                                           self.y + math.sin(self.angle) * self.size,
-                                           YELLOW, speed=3, lifetime=10, size=3))
+    def draw_content(self, surf):
+        cr = self.content_rect
+        # Display
+        pygame.draw.rect(surf, (30,30,50), (cr.x+8, cr.y+8, cr.w-16, 52), border_radius=6)
+        txt = FONT_CALC.render(self.display[-14:], True, COL_WHITE)
+        surf.blit(txt, (cr.right - 16 - txt.get_width(), cr.y + 24))
 
-    def update(self, mouse_pos, camera):
-        # Aim direction
-        wx = mouse_pos[0] + camera.offset_x
-        wy = mouse_pos[1] + camera.offset_y
-        self.angle = math.atan2(wy - self.y, wx - self.x)
+        # Buttons
+        bw, bh = (cr.w-16)//4, 48
+        self._btn_rects = {}
+        mx, my = pygame.mouse.get_pos()
+        by_start = cr.y + 70
+        for ri, row in enumerate(self.BTNS):
+            cols = len(row)
+            span = 4 // cols if cols < 4 else 1
+            for ci, lbl in enumerate(row):
+                if lbl == '0' and cols == 3:
+                    bx = cr.x + 8
+                    bwr = bw * 2 - 4
+                elif lbl == '.' and cols == 3:
+                    bx = cr.x + 8 + bw*2
+                    bwr = bw - 4
+                elif lbl == '=' and cols == 3:
+                    bx = cr.x + 8 + bw*3
+                    bwr = bw - 4
+                else:
+                    bx = cr.x + 8 + ci * bw
+                    bwr = bw - 4
+                br = pygame.Rect(bx, by_start + ri*bh, bwr, bh-4)
+                self._btn_rects[lbl] = br
+                hov = br.collidepoint(mx, my)
+                if lbl in ('÷','×','−','+','='):
+                    c = (255, 160, 50) if not hov else (255, 200, 100)
+                elif lbl in ('C','±','%'):
+                    c = (100,100,120) if not hov else (140,140,160)
+                else:
+                    c = (60,60,80) if not hov else (90,90,110)
+                draw_rect_rounded(surf, c, br, 8)
+                t = FONT_LG.render(lbl, True, COL_WHITE)
+                surf.blit(t, (br.centerx - t.get_width()//2, br.centery - t.get_height()//2))
 
-        # Cooldowns
-        if self.shoot_cooldown > 0:
-            self.shoot_cooldown -= 1
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mx, my = event.pos
+            for lbl, r in self._btn_rects.items():
+                if r.collidepoint(mx, my):
+                    self._press(lbl)
 
-        if self.reloading:
-            self.reload_timer -= 1
-            if self.reload_timer <= 0:
-                needed = self.max_ammo - self.ammo
-                reloaded = min(needed, self.reserve_ammo)
-                self.ammo += reloaded
-                self.reserve_ammo -= reloaded
-                self.reloading = False
+    def _press(self, lbl):
+        if lbl.isdigit() or lbl == '.':
+            if self.new_num:
+                self.display = lbl
+                self.new_num = False
+            else:
+                if lbl == '.' and '.' in self.display: return
+                self.display = self.display + lbl if self.display != '0' else lbl
+        elif lbl == 'C':
+            self.display = '0'; self.prev = None; self.op = None; self.new_num = True
+        elif lbl == '±':
+            val = float(self.display)
+            self.display = str(-val if val != 0 else 0)
+        elif lbl == '%':
+            self.display = str(float(self.display)/100)
+        elif lbl in ('÷','×','−','+'):
+            self.prev = float(self.display)
+            self.op = lbl; self.new_num = True
+        elif lbl == '=':
+            if self.prev is not None and self.op:
+                cur = float(self.display)
+                if   self.op == '÷': res = self.prev/cur if cur else 0
+                elif self.op == '×': res = self.prev*cur
+                elif self.op == '−': res = self.prev-cur
+                elif self.op == '+': res = self.prev+cur
+                else: res = cur
+                self.display = str(int(res)) if res == int(res) else str(round(res,8))
+                self.prev = None; self.op = None; self.new_num = True
 
-        if self.hit_flash > 0:
-            self.hit_flash -= 1
+# ─── FILE EXPLORER ───────────────────────────────────────────────────────────
 
-        # Footstep particles
-        if self.moving:
-            self.footstep_timer += 1
-            if self.footstep_timer % 15 == 0:
-                self.particles.append(Particle(self.x, self.y, SAND, speed=0.5, lifetime=20, size=3))
+class ExplorerWindow(Window):
+    FILES = [
+        ("📁 Documents", "folder"), ("📁 Pictures", "folder"), ("📁 Downloads", "folder"),
+        ("📁 Music", "folder"), ("📁 Videos", "folder"), ("📄 readme.txt", "file"),
+        ("📄 notes.txt", "file"), ("🖼️ wallpaper.png", "image"), ("🎵 song.mp3", "audio"),
+        ("📊 data.xlsx", "sheet"), ("⚙️ config.ini", "config"), ("🗑️ trash", "recycle"),
+    ]
+    def __init__(self, x, y):
+        super().__init__("📁 File Explorer", x, y, 640, 440, "explorer")
+        self.path = "C:\\Users\\User"
+        self.selected = None
+        self.scroll_y = 0
 
-        # Update bullets
-        for b in self.bullets:
-            b.update()
-        self.bullets = [b for b in self.bullets if b.alive]
+    def draw_content(self, surf):
+        cr = self.content_rect
+        # Toolbar
+        pygame.draw.rect(surf, COL_BTN, (cr.x, cr.y, cr.w, 28))
+        for i, lbl in enumerate(["← Back", "→ Forward", "↑ Up", "🔄 Refresh"]):
+            t = FONT_MD.render(lbl, True, COL_BLACK)
+            surf.blit(t, (cr.x+8+i*80, cr.y+6))
+        pygame.draw.line(surf, COL_GRAY, (cr.x, cr.y+28), (cr.right, cr.y+28))
 
-        # Update particles
-        for p in self.particles:
-            p.update()
-        self.particles = [p for p in self.particles if p.alive]
+        # Address bar
+        addr_rect = pygame.Rect(cr.x, cr.y+28, cr.w, 26)
+        pygame.draw.rect(surf, COL_WHITE, addr_rect)
+        pygame.draw.rect(surf, COL_GRAY, addr_rect, 1)
+        surf.blit(FONT_MD.render(self.path, True, COL_DGRAY), (cr.x+6, cr.y+34))
+        pygame.draw.line(surf, COL_GRAY, (cr.x, cr.y+54), (cr.right, cr.y+54))
 
-# ─────────────────────────────────────────────
-#  WORLD SETUP
-# ─────────────────────────────────────────────
-camera = Camera()
+        # Sidebar
+        sb_w = 130
+        pygame.draw.rect(surf, COL_LGRAY, (cr.x, cr.y+54, sb_w, cr.h-54))
+        pygame.draw.line(surf, COL_GRAY, (cr.x+sb_w, cr.y+54), (cr.x+sb_w, cr.bottom))
+        for i, lbl in enumerate(["🖥️ Computer","👤 User","📁 Docs","🖼️ Pics","🎵 Music","🗑️ Recycle"]):
+            t = FONT_SM.render(lbl, True, COL_DGRAY)
+            surf.blit(t, (cr.x+6, cr.y+60+i*22))
 
-player = Player(MAP_WIDTH // 2, MAP_HEIGHT // 2)
+        # Files grid
+        fa = pygame.Rect(cr.x+sb_w+4, cr.y+56, cr.w-sb_w-8, cr.h-58)
+        pygame.draw.rect(surf, COL_WHITE, fa)
+        cols = max(1, fa.w // 80)
+        for idx, (name, ftype) in enumerate(self.FILES):
+            col_i = idx % cols
+            row_i = idx // cols
+            fx = fa.x + col_i*80 + 4
+            fy = fa.y + row_i*80 + 4 - self.scroll_y
+            if fy < fa.y - 80 or fy > fa.bottom: continue
+            fr = pygame.Rect(fx, fy, 72, 72)
+            if idx == self.selected:
+                pygame.draw.rect(surf, (180,210,255), fr, border_radius=4)
+            # Icon
+            ic = {"folder":(220,180,60),"file":(200,220,255),"image":(180,255,200),
+                  "audio":(255,200,150),"sheet":(180,255,180),"config":(220,220,180),
+                  "recycle":(180,220,180)}.get(ftype, COL_LGRAY)
+            draw_rect_rounded(surf, ic, (fx+20, fy+4, 32, 32), 4)
+            t = FONT_ICON.render(name[:10], True, COL_BLACK)
+            surf.blit(t, (fx + 36 - t.get_width()//2, fy+38))
 
-enemies = [Enemy(random.randint(100, MAP_WIDTH-100),
-                 random.randint(100, MAP_HEIGHT-100)) for _ in range(NUM_ENEMIES)]
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            cr = self.content_rect
+            fa = pygame.Rect(cr.x+134, cr.y+56, cr.w-138, cr.h-58)
+            cols = max(1, fa.w // 80)
+            mx, my = event.pos
+            if fa.collidepoint(mx, my):
+                col_i = (mx - fa.x) // 80
+                row_i = (my - fa.y + self.scroll_y) // 80
+                idx = row_i * cols + col_i
+                if 0 <= idx < len(self.FILES):
+                    self.selected = idx
+        elif event.type == pygame.MOUSEWHEEL:
+            self.scroll_y = clamp(self.scroll_y - event.y*20, 0, max(0, (len(self.FILES)//5)*80 - 200))
 
-trees = [Tree(random.randint(0, MAP_WIDTH), random.randint(0, MAP_HEIGHT)) for _ in range(120)]
-buildings = [Building(random.randint(0, MAP_WIDTH), random.randint(0, MAP_HEIGHT)) for _ in range(25)]
+# ─── PAINT APP ───────────────────────────────────────────────────────────────
 
-loot_items = []
-for _ in range(NUM_MEDKITS):
-    loot_items.append(LootItem(random.randint(0, MAP_WIDTH), random.randint(0, MAP_HEIGHT), "medkit"))
-for _ in range(NUM_AMMO_BOXES):
-    loot_items.append(LootItem(random.randint(0, MAP_WIDTH), random.randint(0, MAP_HEIGHT), "ammo"))
-for _ in range(NUM_ARMOR_BOXES):
-    loot_items.append(LootItem(random.randint(0, MAP_WIDTH), random.randint(0, MAP_HEIGHT), "armor"))
+class PaintWindow(Window):
+    COLORS = [(0,0,0),(255,255,255),(200,50,50),(50,200,50),(50,50,200),
+              (255,220,0),(255,140,0),(180,50,180),(50,220,220),(128,128,128)]
+    TOOLS  = ["✏️","🔲","○","↔","🪣","🗑️"]
 
+    def __init__(self, x, y):
+        super().__init__("🎨 Paint", x, y, 700, 480, "paint")
+        self.canvas = pygame.Surface((700, 480))
+        self.canvas.fill(COL_WHITE)
+        self.cur_color = (0,0,0)
+        self.cur_tool = "✏️"
+        self.brush_size = 3
+        self.drawing = False
+        self.last_pos = None
+        self.start_pos = None
+        self._canvas_rect = None
 
-zone_radius = 1200
-zone_center = [MAP_WIDTH // 2, MAP_HEIGHT // 2]
-zone_timer = 0
+    def _get_canvas_rect(self):
+        cr = self.content_rect
+        return pygame.Rect(cr.x+2, cr.y+60, cr.w-4, cr.h-62)
 
-running = True
-while running:
-    clock.tick(FPS)
-    screen.fill((34, 139, 34))  # grass
+    def draw_content(self, surf):
+        cr = self.content_rect
+        # Toolbar
+        pygame.draw.rect(surf, COL_BTN, (cr.x, cr.y, cr.w, 58))
+        pygame.draw.line(surf, COL_GRAY, (cr.x, cr.y+58), (cr.right, cr.y+58))
 
-    # Events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        # Tool buttons
+        for i, t in enumerate(self.TOOLS):
+            br = pygame.Rect(cr.x+4+i*36, cr.y+4, 32, 28)
+            sel = (t == self.cur_tool)
+            draw_rect_rounded(surf, COL_BTN_PRESS if sel else COL_BTN, br, 4)
+            pygame.draw.rect(surf, COL_GRAY, br, 1, border_radius=4)
+            surf.blit(FONT_MD.render(t, True, COL_BLACK), (br.x+4, br.y+5))
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            player.shoot(*pygame.mouse.get_pos(), camera)
+        # Brush size
+        surf.blit(FONT_SM.render("Size:", True, COL_BLACK), (cr.x+230, cr.y+8))
+        for i, sz in enumerate([2,4,8,12]):
+            br = pygame.Rect(cr.x+265+i*30, cr.y+6, 26, 22)
+            draw_rect_rounded(surf, COL_BTN_PRESS if self.brush_size==sz else COL_BTN, br, 4)
+            pygame.draw.rect(surf, COL_GRAY, br, 1, border_radius=4)
+            surf.blit(FONT_SM.render(str(sz), True, COL_BLACK), (br.centerx-5, br.y+4))
 
-    keys = pygame.key.get_pressed()
-    player.handle_input(keys)
-    player.update(pygame.mouse.get_pos(), camera)
+        # Color palette
+        surf.blit(FONT_SM.render("Colors:", True, COL_BLACK), (cr.x+4, cr.y+38))
+        for i, c in enumerate(self.COLORS):
+            cr2 = pygame.Rect(cr.x+54+i*26, cr.y+34, 22, 20)
+            pygame.draw.rect(surf, c, cr2, border_radius=3)
+            if c == self.cur_color:
+                pygame.draw.rect(surf, COL_BLACK, cr2, 2, border_radius=3)
 
-    camera.update(player.x, player.y)
+        # Current color preview
+        pygame.draw.rect(surf, self.cur_color, (cr.right-50, cr.y+6, 44, 44), border_radius=4)
+        pygame.draw.rect(surf, COL_BLACK, (cr.right-50, cr.y+6, 44, 44), 2, border_radius=4)
 
-    # Update enemies
-    for enemy in enemies:
-        enemy.update(player, [])
+        # Canvas area
+        cvr = self._get_canvas_rect()
+        self._canvas_rect = cvr
+        pygame.draw.rect(surf, COL_WHITE, cvr)
+        # Blit canvas (clip to fit)
+        clipped = self.canvas.subsurface(pygame.Rect(0, 0, min(cvr.w, self.canvas.get_width()), min(cvr.h, self.canvas.get_height())))
+        surf.blit(clipped, (cvr.x, cvr.y))
+        pygame.draw.rect(surf, COL_GRAY, cvr, 1)
 
-    # Bullet collision
-    for bullet in player.bullets:
-        for enemy in enemies:
-            if enemy.alive:
-                dist = math.hypot(enemy.x - bullet.x, enemy.y - bullet.y)
-                if dist < enemy.size:
-                    if enemy.take_damage(BULLET_DAMAGE):
-                        player.kills += 1
-                    bullet.alive = False
+    def handle_event(self, event):
+        cr = self.content_rect
+        cvr = self._get_canvas_rect() if self._canvas_rect else self._get_canvas_rect()
+        # Color clicks
+        for i, c in enumerate(self.COLORS):
+            cr2 = pygame.Rect(cr.x+54+i*26, cr.y+34, 22, 20)
+            if event.type == pygame.MOUSEBUTTONDOWN and cr2.collidepoint(event.pos):
+                self.cur_color = c; return
+        # Tool clicks
+        for i, t in enumerate(self.TOOLS):
+            br = pygame.Rect(cr.x+4+i*36, cr.y+4, 32, 28)
+            if event.type == pygame.MOUSEBUTTONDOWN and br.collidepoint(event.pos):
+                if t == "🗑️":
+                    self.canvas.fill(COL_WHITE)
+                else:
+                    self.cur_tool = t; return
+        # Size clicks
+        for i, sz in enumerate([2,4,8,12]):
+            br = pygame.Rect(cr.x+265+i*30, cr.y+6, 26, 22)
+            if event.type == pygame.MOUSEBUTTONDOWN and br.collidepoint(event.pos):
+                self.brush_size = sz; return
 
-    # Enemy bullets hit player
-    for enemy in enemies:
-        for bullet in enemy.bullets:
-            dist = math.hypot(player.x - bullet.x, player.y - bullet.y)
-            if dist < player.size:
-                player.health -= 5
-                bullet.alive = False
+        # Drawing
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if cvr.collidepoint(event.pos):
+                self.drawing = True
+                lx = event.pos[0] - cvr.x
+                ly = event.pos[1] - cvr.y
+                self.last_pos = (lx, ly)
+                self.start_pos = (lx, ly)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if self.drawing and self.cur_tool in ("🔲","○") and self.start_pos:
+                lx = event.pos[0] - cvr.x
+                ly = event.pos[1] - cvr.y
+                ex, ey = lx, ly
+                sx, sy = self.start_pos
+                if self.cur_tool == "🔲":
+                    pygame.draw.rect(self.canvas, self.cur_color, (min(sx,ex),min(sy,ey),abs(ex-sx),abs(ey-sy)), self.brush_size)
+                elif self.cur_tool == "○":
+                    cx2, cy2 = (sx+ex)//2, (sy+ey)//2
+                    rx, ry = abs(ex-sx)//2, abs(ey-sy)//2
+                    if rx>0 and ry>0:
+                        pygame.draw.ellipse(self.canvas, self.cur_color, (cx2-rx,cy2-ry,rx*2,ry*2), self.brush_size)
+            self.drawing = False; self.last_pos = None
+        elif event.type == pygame.MOUSEMOTION:
+            if self.drawing and cvr.collidepoint(event.pos):
+                lx = event.pos[0] - cvr.x
+                ly = event.pos[1] - cvr.y
+                if self.cur_tool == "✏️" and self.last_pos:
+                    pygame.draw.line(self.canvas, self.cur_color, self.last_pos, (lx,ly), self.brush_size)
+                elif self.cur_tool == "↔" and self.last_pos:
+                    pygame.draw.line(self.canvas, self.cur_color, self.last_pos, (lx,ly), self.brush_size)
+                self.last_pos = (lx, ly)
 
-    # Safe zone shrink
-    zone_timer += 1
-    if zone_timer > ZONE_SHRINK_INTERVAL and zone_radius > ZONE_MIN_RADIUS:
-        zone_radius -= 40
-        zone_timer = 0
+# ─── TERMINAL APP ────────────────────────────────────────────────────────────
 
-    # Damage outside zone
-    dist_zone = math.hypot(player.x - zone_center[0], player.y - zone_center[1])
-    if dist_zone > zone_radius:
-        player.health -= ZONE_DAMAGE
-
-    # Draw world
-    for tree in trees:
-        tree.draw(screen, camera)
-
-    for building in buildings:
-        building.draw(screen, camera)
-
-    for item in loot_items:
-        item.update()
-        item.draw(screen, camera)
-
-    # Draw enemies
-    for enemy in enemies:
-        enemy.draw(screen, camera)
-
-    # Draw player
-    px, py = camera.apply(int(player.x), int(player.y))
-    pygame.draw.circle(screen, player.color, (px, py), player.size)
-
-    # Draw bullets
-    for b in player.bullets:
-        b.draw(screen, camera)
-
-    # Draw safe zone
-    zx, zy = camera.apply(zone_center[0], zone_center[1])
-    pygame.draw.circle(screen, BLUE, (int(zx), int(zy)), int(zone_radius), 2)
-
-    # UI
-    hp_text = font_medium.render(f"HP: {int(player.health)}", True, WHITE)
-    ammo_text = font_medium.render(f"Ammo: {player.ammo}/{player.reserve_ammo}", True, WHITE)
-    kills_text = font_medium.render(f"Kills: {player.kills}", True, WHITE)
-    weapon_text = font_medium.render(f"Gun: {player.weapon}", True, WHITE)
-
-    screen.blit(hp_text, (10, 10))
-    screen.blit(ammo_text, (10, 40))
-    screen.blit(kills_text, (10, 70))
-    screen.blit(weapon_text, (10, 100))
-
-    # Game Over
-    if player.health <= 0:
-        game_over = font_large.render("GAME OVER", True, RED)
-        screen.blit(game_over, (SCREEN_WIDTH//2 - 120, SCREEN_HEIGHT//2))
-        pygame.display.update()
-        pygame.time.delay(3000)
-        running = False
-
-    pygame.display.update()
-
-pygame.quit()
-sys.exit()
-
-
-
-
-
-
-# ─────────────────────────────────────────────
-#  WEAPON SYSTEM
-# ─────────────────────────────────────────────
-WEAPONS = {
-    "Pistol": {
-        "damage": 18,
-        "bullet_speed": 12,
-        "cooldown": 25,
-        "mag": 12,
-        "reload": 60,
-        "recoil": 0.03
-    },
-    "M416": {
-        "damage": 20,
-        "bullet_speed": 14,
-        "cooldown": 10,
-        "mag": 30,
-        "reload": 90,
-        "recoil": 0.06
-    },
-    "AKM": {
-        "damage": 28,
-        "bullet_speed": 15,
-        "cooldown": 14,
-        "mag": 30,
-        "reload": 100,
-        "recoil": 0.1
-    },
-    "Sniper": {
-        "damage": 70,
-        "bullet_speed": 20,
-        "cooldown": 60,
-        "mag": 5,
-        "reload": 120,
-        "recoil": 0.2
+class TerminalWindow(Window):
+    CMDS = {
+        "help"  : "Available: help, ls, dir, echo, date, time, clear, whoami, sysinfo, version",
+        "ls"    : "Documents/  Downloads/  Music/  Pictures/  readme.txt  .bashrc",
+        "dir"   : "Documents\\  Downloads\\  Music\\  Pictures\\  readme.txt  config.ini",
+        "whoami": "User@PyOS",
+        "version":"PyOS 1.0.0 (Pygame Edition) - Python {}.{}".format(*sys.version_info[:2]),
+        "sysinfo":"OS: PyOS | CPU: Pygame Core | RAM: 9001 MB | Disk: ∞",
+        "date"  : str(datetime.date.today()),
+        "time"  : lambda: str(datetime.datetime.now().strftime("%H:%M:%S")),
+        "echo"  : "echo",
+        "clear" : "CLEAR",
     }
-}
+    def __init__(self, x, y):
+        super().__init__("💻 Terminal", x, y, 560, 380, "terminal")
+        self.lines = ["PyOS Terminal [Version 1.0.0]", "Type 'help' for commands.", ""]
+        self.input = ""
+        self.cursor_blink = 0
 
+    def draw_content(self, surf):
+        cr = self.content_rect
+        pygame.draw.rect(surf, COL_TERM_BG, cr)
+        y_off = cr.y + 4
+        for line in self.lines[-(cr.h//18 - 1):]:
+            t = FONT_MONO.render(line, True, COL_TERM_TEXT)
+            surf.blit(t, (cr.x+6, y_off))
+            y_off += 18
+        # Input line
+        prompt = "User@PyOS:~$ " + self.input
+        if self.cursor_blink % 60 < 30:
+            prompt += "█"
+        t = FONT_MONO.render(prompt, True, (50,220,50))
+        surf.blit(t, (cr.x+6, y_off))
+        self.cursor_blink = (self.cursor_blink+1) % 60
 
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                self._run_cmd()
+            elif event.key == pygame.K_BACKSPACE:
+                self.input = self.input[:-1]
+            elif event.unicode and event.unicode.isprintable():
+                self.input += event.unicode
 
-def shoot(self, target_x, target_y, camera):
-    if self.reloading or self.shoot_cooldown > 0 or self.ammo <= 0:
-        return
+    def _run_cmd(self):
+        cmd_full = self.input.strip()
+        self.lines.append("User@PyOS:~$ " + cmd_full)
+        cmd = cmd_full.split()[0].lower() if cmd_full else ""
+        args = cmd_full[len(cmd):].strip()
+        if cmd in self.CMDS:
+            val = self.CMDS[cmd]
+            if callable(val):
+                val = val()
+            if val == "CLEAR":
+                self.lines = []
+            elif cmd == "echo":
+                self.lines.append(args)
+            else:
+                self.lines.append(val)
+        elif cmd == "":
+            pass
+        else:
+            self.lines.append(f"'{cmd}': command not found. Try 'help'.")
+        self.lines.append("")
+        self.input = ""
 
-    wx = target_x + camera.offset_x
-    wy = target_y + camera.offset_y
+# ─── SETTINGS WINDOW ─────────────────────────────────────────────────────────
 
-    base_angle = math.atan2(wy - self.y, wx - self.x)
+class SettingsWindow(Window):
+    THEMES = [("Classic Blue", (58,110,165)), ("Forest Green",(50,120,50)),
+              ("Deep Purple",(80,30,120)), ("Midnight Dark",(20,20,30)),
+              ("Sunset Orange",(180,80,20))]
+    def __init__(self, x, y, os_ref):
+        super().__init__("⚙️ Settings", x, y, 480, 380, "settings")
+        self.os_ref = os_ref
+        self.selected_theme = 0
+        self.volume = 70
+        self.brightness = 100
+        self._vol_dragging = False
+        self._bri_dragging = False
 
-    # 🔥 RECOIL (random spray)
-    recoil_offset = random.uniform(-self.recoil, self.recoil)
-    self.angle = base_angle + recoil_offset
+    def draw_content(self, surf):
+        cr = self.content_rect
+        # Sidebar
+        pygame.draw.rect(surf, COL_LGRAY, (cr.x, cr.y, 130, cr.h))
+        for i, lbl in enumerate(["🎨 Theme","🔊 Sound","💡 Display","🔒 Privacy","ℹ️ About"]):
+            t = FONT_MD.render(lbl, True, COL_BLACK)
+            sel = (i==0)
+            if sel: pygame.draw.rect(surf, COL_WHITE, (cr.x, cr.y+i*36, 130, 34))
+            surf.blit(t, (cr.x+8, cr.y+8+i*36))
+        pygame.draw.line(surf, COL_GRAY, (cr.x+130, cr.y), (cr.x+130, cr.bottom))
 
-    b = Bullet(self.x, self.y, self.angle, owner="player", damage=self.damage)
-    b.speed = self.bullet_speed
-    self.bullets.append(b)
+        # Theme section
+        panel = pygame.Rect(cr.x+138, cr.y+8, cr.w-146, cr.h-16)
+        surf.blit(FONT_LG.render("Desktop Theme", True, COL_BLACK), (panel.x, panel.y))
+        pygame.draw.line(surf, COL_LGRAY, (panel.x, panel.y+24), (panel.right, panel.y+24))
 
-    self.ammo -= 1
-    self.shoot_cooldown = self.shoot_delay
+        for i, (name, color) in enumerate(self.THEMES):
+            ty = panel.y + 34 + i*42
+            # Preview swatch
+            pygame.draw.rect(surf, color, (panel.x, ty, 60, 32), border_radius=4)
+            pygame.draw.rect(surf, COL_BLACK if i==self.selected_theme else COL_GRAY,
+                             (panel.x, ty, 60, 32), 2, border_radius=4)
+            # Taskbar strip in preview
+            pygame.draw.rect(surf, tuple(max(0,c-30) for c in color), (panel.x, ty+24, 60, 8))
+            surf.blit(FONT_SM.render(name, True, COL_BLACK), (panel.x+68, ty+8))
+            if i == self.selected_theme:
+                surf.blit(FONT_SM.render("✔ Active", True, (0,160,0)), (panel.x+200, ty+8))
 
-    # Visual recoil kick (screen feel)
-    self.x -= math.cos(self.angle) * 1.5
-    self.y -= math.sin(self.angle) * 1.5
+        # Volume slider
+        vy = panel.y+34+len(self.THEMES)*42+8
+        surf.blit(FONT_MD.render(f"Volume: {self.volume}%", True, COL_BLACK), (panel.x, vy))
+        sw = panel.w-10
+        pygame.draw.rect(surf, COL_LGRAY, (panel.x, vy+22, sw, 8), border_radius=4)
+        vx = panel.x + int(self.volume/100*sw)
+        pygame.draw.rect(surf, COL_TASKBAR, (panel.x, vy+22, vx-panel.x, 8), border_radius=4)
+        pygame.draw.circle(surf, COL_WIN_TITLE, (vx, vy+26), 8)
 
-    # Muzzle flash
-    for _ in range(6):
-        self.particles.append(Particle(
-            self.x + math.cos(self.angle) * self.size,
-            self.y + math.sin(self.angle) * self.size,
-            YELLOW, speed=3, lifetime=10, size=3))
+    def handle_event(self, event):
+        cr = self.content_rect
+        panel_x = cr.x+138
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button==1:
+            mx, my = event.pos
+            for i, (name, color) in enumerate(self.THEMES):
+                ty = cr.y+8 + 34 + i*42
+                if pygame.Rect(panel_x, ty, 260, 32).collidepoint(mx, my):
+                    self.selected_theme = i
+                    self.os_ref.desktop_color = color
+            # Volume drag
+            vy = cr.y+8+34+len(self.THEMES)*42+30
+            sw = cr.w-146-10
+            if pygame.Rect(panel_x, vy, sw, 16).collidepoint(mx, my):
+                self.volume = clamp(int((mx-panel_x)/sw*100), 0, 100)
+                self._vol_dragging = True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self._vol_dragging = False
+        elif event.type == pygame.MOUSEMOTION and self._vol_dragging:
+            cr = self.content_rect
+            panel_x = cr.x+138
+            sw = cr.w-146-10
+            self.volume = clamp(int((event.pos[0]-panel_x)/sw*100), 0, 100)
 
+# ─── CONTEXT MENU ────────────────────────────────────────────────────────────
 
-if self.reloading:
-    self.reload_timer -= 1
-    if self.reload_timer <= 0:
-        needed = self.max_ammo - self.ammo
-        reloaded = min(needed, self.reserve_ammo)
-        self.ammo += reloaded
-        self.reserve_ammo -= reloaded
-        self.reloading = False
+class ContextMenu:
+    def __init__(self, x, y, items):
+        self.x, self.y = x, y
+        self.items = items  # list of (label, callback)
+        self.item_h = 26
+        self.w = 180
+        self.alive = True
+        self.rect = pygame.Rect(x, y, self.w, len(items)*self.item_h+8)
 
+    def draw(self, surf):
+        draw_rect_rounded(surf, COL_WHITE, self.rect, 4)
+        pygame.draw.rect(surf, COL_GRAY, self.rect, 1, border_radius=4)
+        mx, my = pygame.mouse.get_pos()
+        for i, (lbl, _) in enumerate(self.items):
+            ir = pygame.Rect(self.x+2, self.y+4+i*self.item_h, self.w-4, self.item_h)
+            if ir.collidepoint(mx, my) and lbl != "---":
+                pygame.draw.rect(surf, (200,220,255), ir, border_radius=3)
+            if lbl == "---":
+                pygame.draw.line(surf, COL_LGRAY, (self.x+8, self.y+4+i*self.item_h+13),
+                                 (self.x+self.w-8, self.y+4+i*self.item_h+13))
+            else:
+                surf.blit(FONT_MD.render(lbl, True, COL_BLACK), (self.x+10, self.y+6+i*self.item_h))
 
-if keys[pygame.K_1]:
-    self.load_weapon("Pistol")
-if keys[pygame.K_2]:
-    self.load_weapon("M416")
-if keys[pygame.K_3]:
-    self.load_weapon("AKM")
-if keys[pygame.K_4]:
-    self.load_weapon("Sniper")
+    def handle_click(self, pos):
+        mx, my = pos
+        for i, (lbl, cb) in enumerate(self.items):
+            ir = pygame.Rect(self.x+2, self.y+4+i*self.item_h, self.w-4, self.item_h)
+            if ir.collidepoint(mx, my) and lbl != "---" and cb:
+                cb()
+                self.alive = False
+                return True
+        return False
 
+# ─── CLOCK / TRAY ────────────────────────────────────────────────────────────
 
+class SystemTray:
+    def __init__(self):
+        self.rect = pygame.Rect(SCREEN_W-140, 0, 140, TASKBAR_H)
 
-weapon_text = font_medium.render(f"Gun: {player.weapon}", True, WHITE)
-screen.blit(weapon_text, (10, 100))
+    def draw(self, surf):
+        pygame.draw.rect(surf, COL_TASKBAR, self.rect)
+        now = datetime.datetime.now()
+        time_str = now.strftime("%H:%M:%S")
+        date_str = now.strftime("%d %b %Y")
+        t1 = FONT_CLOCK.render(time_str, True, COL_WHITE)
+        t2 = FONT_SM.render(date_str, True, (180,210,255))
+        surf.blit(t1, (SCREEN_W-130, 5))
+        surf.blit(t2, (SCREEN_W-130, 22))
+        # Battery icon
+        pygame.draw.rect(surf, COL_WHITE, (SCREEN_W-148, 14, 12, 20), 1)
+        pygame.draw.rect(surf, COL_GREEN, (SCREEN_W-147, 22, 10, 11))
+        pygame.draw.rect(surf, COL_WHITE, (SCREEN_W-144, 12, 6, 3))
+        # Wifi icon
+        for i in range(3):
+            r = 4+i*3
+            pygame.draw.arc(surf, COL_WHITE, (SCREEN_W-170-r, 18-r, r*2, r*2), 0.4, 2.74, 2)
+        pygame.draw.circle(surf, COL_WHITE, (SCREEN_W-170, 28), 2)
+
+# ─── START MENU ──────────────────────────────────────────────────────────────
+
+class StartMenu:
+    APPS = [
+        ("📄 Notepad", "notepad"), ("🧮 Calculator", "calculator"),
+        ("📁 File Explorer", "explorer"), ("🎨 Paint", "paint"),
+        ("💻 Terminal", "terminal"), ("⚙️ Settings", "settings"),
+    ]
+    def __init__(self):
+        self.visible = False
+        self.w, self.h = 260, 380
+        self.rect = pygame.Rect(0, SCREEN_H-TASKBAR_H-self.h, self.w, self.h)
+
+    def toggle(self):
+        self.visible = not self.visible
+
+    def draw(self, surf):
+        if not self.visible: return
+        # Background
+        draw_gradient_rect(surf, (40,80,160), COL_STARTMENU, self.rect.tuple() if hasattr(self.rect,'tuple') else (self.rect.x,self.rect.y,self.rect.w,self.rect.h))
+        pygame.draw.rect(surf, COL_WIN_BORDER, self.rect, 2, border_radius=4)
+
+        # Header
+        pygame.draw.rect(surf, (20,50,110), (self.rect.x, self.rect.y, self.rect.w, 54))
+        surf.blit(FONT_XL.render("PyOS", True, COL_WHITE), (self.rect.x+10, self.rect.y+8))
+        surf.blit(FONT_SM.render("Welcome, User", True, (180,210,255)), (self.rect.x+10, self.rect.y+36))
+
+        # Divider
+        pygame.draw.line(surf, COL_WIN_TITLE2, (self.rect.x, self.rect.y+54), (self.rect.right, self.rect.y+54))
+
+        # App list
+        mx, my = pygame.mouse.get_pos()
+        surf.blit(FONT_SM.render("Programs", True, (180,210,255)), (self.rect.x+10, self.rect.y+60))
+        for i, (name, _) in enumerate(self.APPS):
+            ir = pygame.Rect(self.rect.x, self.rect.y+76+i*38, self.rect.w, 36)
+            if ir.collidepoint(mx, my):
+                pygame.draw.rect(surf, (80,120,200), ir)
+            t = FONT_MD.render(name, True, COL_WHITE)
+            surf.blit(t, (self.rect.x+12, self.rect.y+84+i*38))
+
+        # Footer
+        pygame.draw.line(surf, COL_WIN_TITLE2, (self.rect.x, self.rect.bottom-36), (self.rect.right, self.rect.bottom-36))
+        surf.blit(FONT_MD.render("🔴 Shut Down", True, COL_WHITE), (self.rect.x+12, self.rect.bottom-28))
+        surf.blit(FONT_MD.render("🔁 Restart", True, COL_WHITE), (self.rect.x+130, self.rect.bottom-28))
+
+    def handle_click(self, pos, os_ref):
+        if not self.visible: return False
+        mx, my = pos
+        if not self.rect.collidepoint(mx, my):
+            self.visible = False
+            return False
+        for i, (name, app_type) in enumerate(self.APPS):
+            ir = pygame.Rect(self.rect.x, self.rect.y+76+i*38, self.rect.w, 36)
+            if ir.collidepoint(mx, my):
+                os_ref.launch_app(app_type)
+                self.visible = False
+                return True
+        # Shutdown
+        if pygame.Rect(self.rect.x+12, self.rect.bottom-28, 120, 20).collidepoint(mx, my):
+            pygame.quit(); sys.exit()
+        return True
+
+# ─── TASKBAR ─────────────────────────────────────────────────────────────────
+
+class Taskbar:
+    def __init__(self):
+        self.rect = pygame.Rect(0, SCREEN_H-TASKBAR_H, SCREEN_W, TASKBAR_H)
+        self.start_btn = pygame.Rect(4, SCREEN_H-TASKBAR_H+4, 90, TASKBAR_H-8)
+        self.tray = SystemTray()
+
+    def draw(self, surf, windows, focused_win):
+        draw_gradient_rect(surf, COL_TASKBAR, (15,55,115), (0, SCREEN_H-TASKBAR_H, SCREEN_W, TASKBAR_H))
+        pygame.draw.line(surf, COL_WIN_TITLE2, (0, SCREEN_H-TASKBAR_H), (SCREEN_W, SCREEN_H-TASKBAR_H))
+
+        # Start button
+        mx, my = pygame.mouse.get_pos()
+        sh = self.start_btn.collidepoint(mx, my)
+        draw_gradient_rect(surf, (90,160,60) if sh else COL_START_BTN,
+                           (50,110,30) if sh else (40,90,20), self.start_btn.inflate(0,0))
+        pygame.draw.rect(surf, (20,80,10), self.start_btn, 1, border_radius=4)
+        surf.blit(FONT_LG.render("⊞ Start", True, COL_WHITE),
+                  (self.start_btn.x+6, self.start_btn.y+8))
+
+        # Window buttons
+        btn_x = 100
+        for w in windows:
+            if not w.alive: continue
+            bw = min(160, max(80, 140))
+            br = pygame.Rect(btn_x, SCREEN_H-TASKBAR_H+4, bw, TASKBAR_H-8)
+            focused = (w is focused_win)
+            bg = COL_WIN_TITLE if focused else COL_TASKBAR_BTN
+            draw_rect_rounded(surf, bg, br, 4)
+            pygame.draw.rect(surf, COL_WIN_BORDER if focused else COL_GRAY, br, 1, border_radius=4)
+            if w.minimized:
+                pygame.draw.line(surf, COL_WIN_TITLE2, (br.x+4, br.bottom-6), (br.right-4, br.bottom-6), 2)
+            lbl = FONT_SM.render(w.title[:18], True, COL_WHITE)
+            surf.blit(lbl, (br.x+6, br.centery-7))
+            w.taskbar_btn = br
+            btn_x += bw + 4
+
+        self.tray.draw(surf)
+
+# ─── OS CORE ─────────────────────────────────────────────────────────────────
+
+class OperatingSystem:
+    def __init__(self):
+        self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+        pygame.display.set_caption("PyOS — Pygame Windows Simulator")
+        self.clock = pygame.time.Clock()
+        self.desktop_color = COL_DESKTOP
+        self.windows = []
+        self.focused_win = None
+        self.taskbar = Taskbar()
+        self.start_menu = StartMenu()
+        self.context_menu = None
+        self.desktop_icons = self._make_icons()
+        self._win_counter = 0
+        # Draw starfield
+        self.stars = [(random.randint(0,SCREEN_W), random.randint(0,SCREEN_H-TASKBAR_H), random.random()) for _ in range(60)]
+
+    def _make_icons(self):
+        defs = [
+            ("Notepad",   (70,130,220),  40, 40, "notepad"),
+            ("Calculator",(80,160,80),  40,140, "calculator"),
+            ("Explorer",  (220,170,50), 40,240, "explorer"),
+            ("Paint",     (220,80,80),  40,340, "paint"),
+            ("Terminal",  (30,30,30),   40,440, "terminal"),
+            ("Settings",  (120,80,200), 40,540, "settings"),
+            ("Recycle",   (80,180,80),  40,620, "recycle"),
+        ]
+        return [DesktopIcon(n,c,x,y,t) for n,c,x,y,t in defs]
+
+    def launch_app(self, app_type, x=None, y=None):
+        self._win_counter += 1
+        ox = (200 + self._win_counter*25) % (SCREEN_W-400) if x is None else x
+        oy = (60  + self._win_counter*25) % (SCREEN_H-TASKBAR_H-300) if y is None else y
+        if   app_type == "notepad":    w = NotepadWindow(ox, oy)
+        elif app_type == "calculator": w = CalculatorWindow(ox, oy)
+        elif app_type == "explorer":   w = ExplorerWindow(ox, oy)
+        elif app_type == "paint":      w = PaintWindow(ox, oy)
+        elif app_type == "terminal":   w = TerminalWindow(ox, oy)
+        elif app_type == "settings":   w = SettingsWindow(ox, oy, self)
+        else: return
+        self.windows.append(w)
+        self.focused_win = w
+
+    def _draw_desktop(self):
+        # Gradient desktop background
+        draw_gradient_rect(self.screen, self.desktop_color,
+                           tuple(max(0,c-40) for c in self.desktop_color),
+                           (0,0,SCREEN_W,SCREEN_H-TASKBAR_H))
+        # Stars / dots
+        for sx, sy, sz in self.stars:
+            r = max(1, int(sz*3))
+            pygame.draw.circle(self.screen, (255,255,255,int(sz*120)),
+                               (sx,sy), r)
+        # Grid pattern
+        for gx in range(0, SCREEN_W, 60):
+            pygame.draw.line(self.screen, (*self.desktop_color, 80),
+                             (gx,0),(gx,SCREEN_H-TASKBAR_H), 1)
+        for gy in range(0, SCREEN_H-TASKBAR_H, 60):
+            pygame.draw.line(self.screen, (*self.desktop_color, 80),
+                             (0,gy),(SCREEN_W,gy), 1)
+
+    def run(self):
+        while True:
+            self.clock.tick(FPS)
+            events = pygame.event.get()
+
+            for event in events:
+                if event.type == pygame.QUIT:
+                    pygame.quit(); sys.exit()
+
+                # Context menu
+                if self.context_menu and self.context_menu.alive:
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        if not self.context_menu.handle_click(event.pos):
+                            self.context_menu.alive = False
+                    continue
+
+                # Start menu
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if self.taskbar.start_btn.collidepoint(event.pos):
+                        self.start_menu.toggle()
+                    elif self.start_menu.visible:
+                        self.start_menu.handle_click(event.pos, self)
+
+                # Taskbar window buttons
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for w in self.windows:
+                        if w.taskbar_btn and w.taskbar_btn.collidepoint(event.pos):
+                            if w.minimized:
+                                w.minimized = False
+                                self.focused_win = w
+                            elif self.focused_win is w:
+                                w.minimized = True
+                            else:
+                                self.focused_win = w
+
+                # Desktop right-click
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                    mx, my = event.pos
+                    if my < SCREEN_H - TASKBAR_H:
+                        on_icon = False
+                        for icon in self.desktop_icons:
+                            if icon.rect.collidepoint(mx, my):
+                                on_icon = True
+                                self.context_menu = ContextMenu(mx, my, [
+                                    ("▶ Open", lambda t=icon.app_type: self.launch_app(t)),
+                                    ("---",None),
+                                    ("Properties", None),
+                                ])
+                                break
+                        if not on_icon:
+                            self.context_menu = ContextMenu(mx, my, [
+                                ("📄 New Notepad", lambda: self.launch_app("notepad")),
+                                ("🎨 Open Paint",  lambda: self.launch_app("paint")),
+                                ("💻 Terminal",    lambda: self.launch_app("terminal")),
+                                ("---",None),
+                                ("⚙️ Settings",    lambda: self.launch_app("settings")),
+                                ("🖼️ Change Wallpaper", self._cycle_wallpaper),
+                            ])
+
+                # Desktop icon click
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    clicked_icon = False
+                    for icon in self.desktop_icons:
+                        if icon.rect.collidepoint(event.pos):
+                            icon.selected = True
+                            clicked_icon = True
+                        else:
+                            icon.selected = False
+                    if not clicked_icon:
+                        for icon in self.desktop_icons: icon.selected = False
+
+                # Double-click icon to open
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    # Use click count trick
+                    pass
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    for icon in self.desktop_icons:
+                        if icon.rect.collidepoint(event.pos):
+                            if not hasattr(icon, '_last_click'):
+                                icon._last_click = 0
+                            now = pygame.time.get_ticks()
+                            if now - icon._last_click < 400:
+                                self.launch_app(icon.app_type)
+                            icon._last_click = now
+
+                # Window events
+                handled_by_win = False
+                for w in reversed(self.windows):
+                    if not w.alive or w.minimized: continue
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if w.rect.collidepoint(event.pos):
+                            self.focused_win = w
+                            # Bring to front
+                            self.windows.remove(w)
+                            self.windows.append(w)
+                    consumed = w.handle_titlebar_event(event, self)
+                    if self.focused_win is w:
+                        w.handle_event(event)
+                    break 
+
+            # Remove dead windows
+            self.windows = [w for w in self.windows if w.alive]
+
+            # ── DRAW ──
+            self._draw_desktop()
+
+            # Desktop icons
+            for icon in self.desktop_icons:
+                icon.draw(self.screen)
+
+            # Windows (back to front)
+            for w in self.windows:
+                if not w.minimized:
+                    w.draw(self.screen, focused=(w is self.focused_win))
+
+            # Taskbar
+            self.taskbar.draw(self.screen, self.windows, self.focused_win)
+
+            # Start menu (on top)
+            self.start_menu.draw(self.screen)
+
+            # Context menu
+            if self.context_menu and self.context_menu.alive:
+                self.context_menu.draw(self.screen)
+
+            pygame.display.flip()
+
+    def _cycle_wallpaper(self):
+        palettes = [
+            (58,110,165), (50,120,50), (80,30,120), (20,20,30), (140,60,20)
+        ]
+        idx = 0
+        for i, p in enumerate(palettes):
+            if p == self.desktop_color:
+                idx = (i+1) % len(palettes)
+                break
+        self.desktop_color = palettes[idx]
+
+# ─── ENTRY POINT ─────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    os_sim = OperatingSystem()
+    # Open a couple of starter windows
+    os_sim.launch_app("notepad", 160, 60)
+    os_sim.launch_app("calculator", 700, 60)
+    os_sim.run()
